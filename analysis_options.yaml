@@ -1,0 +1,13 @@
+# This file configures the Dart analyzer.
+
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - project_backups/**
+
+linter:
+  rules:
+    # Uncomment any rules you want to enable.
+    # avoid_print: false
+    # prefer_single_quotes: true
