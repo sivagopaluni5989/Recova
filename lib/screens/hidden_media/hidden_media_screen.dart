@@ -563,27 +563,7 @@ Padding(
 
 const SizedBox(height: 14),
 
-          // ============================================================
-          // DOCUMENT CARD
-          // ============================================================
-
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(
-              horizontal: 12,
-            ),
-            child: _categoryCardButton(
-              Icons.description,
-              "Documents",
-              documents,
-              Colors.teal,
-              HiddenCategory.documents,
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // ============================================================
+           // ============================================================
           // SCAN BUTTON
           // ============================================================
 
