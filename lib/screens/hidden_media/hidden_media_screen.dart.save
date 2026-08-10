@@ -1,0 +1,378 @@
+import 'package:flutter/material.dart';
+import 'package:photo_manager/photo_manager.dart';
+
+import '../../models/media_file.dart';
+import '../../services/media_scanner_service.dart';
+import '../../services/recovery_service.dart';
+import '../../services/hidden_folder_scanner_service.dart';
+
+enum HiddenCategory {
+  all,
+  folders,
+  images,
+  videos,
+  documents,
+}
+
+class HiddenMediaScreen extends StatefulWidget {
+  const HiddenMediaScreen({
+    super.key,
+  });
+
+  @override
+  State<HiddenMediaScreen> createState() =>
+      _HiddenMediaScreenState();
+}
+
+class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
+  final MediaScannerService scanner =
+      MediaScannerService();
+
+  final HiddenFolderScannerService hiddenScanner =
+      HiddenFolderScannerService();
+
+  final RecoveryService recoveryService =
+      RecoveryService();
+
+  HiddenCategory selectedCategory =
+      HiddenCategory.all;
+
+  List<MediaFile> files = [];
+
+  List<MediaFile> imageFiles = [];
+
+  List<MediaFile> videoFiles = [];
+
+  List<MediaFile> documentFiles = [];
+
+  bool loading = false;
+
+  double progress = 0;
+
+  int images = 0;
+
+  int videos = 0;
+
+  int documents = 0;
+
+  int hiddenFolders = 0;
+
+  Set<String> hiddenFolderPaths = {};
+
+  String folder = "Ready";
+
+  Future<void> scan() async {
+    setState(() {
+      loading = true;
+
+      progress = 0;
+
+      images = 0;
+
+      videos = 0;
+
+      documents = 0;
+
+      hiddenFolders = 0;
+
+      hiddenFolderPaths.clear();
+
+      files.clear();
+
+      imageFiles.clear();
+
+      videoFiles.clear();
+
+      documentFiles.clear();
+
+      folder = "Scanning hidden media...";
+    });
+
+    try {
+      final scannedFiles = await scanner.scanMedia(
+        onProgress: (
+          percent,
+          currentFolder,
+          current,
+          total,
+          imageCount,
+          videoCount,
+          documentCount,
+        ) {
+          if (!mounted) {
+            return;
+          }
+
+          setState(() {
+            progress = percent;
+
+            folder = currentFolder;
+
+            images = imageCount;
+
+            videos = videoCount;
+
+            documents = documentCount;
+          });
+        },
+      );
+
+      files = List<MediaFile>.from(scannedFiles);
+
+      final hiddenFiles =
+          await hiddenScanner.scanHiddenFolders(
+        onProgress: (
+          percent,
+          currentFolder,
+          current,
+          total,
+          imageCount,
+          videoCount,
+        ) {
+          if (!mounted) {
+            return;
+          }
+
+          setState(() {
+            progress = percent;
+
+            folder = "Hidden: $currentFolder";
+
+            hiddenFolderPaths.add(
+              currentFolder,
+            );
+          });
+        },
+      );
+
+      files.addAll(hiddenFiles);
+
+      files = removeDuplicates(files);
+
+      imageFiles = files
+          .where(
+            (file) =>
+                file.mediaType == MediaType.image,
+          )
+          .toList();
+
+      videoFiles = files
+          .where(
+            (file) =>
+                file.mediaType == MediaType.video,
+          )
+          .toList();
+
+      /*
+       * Documents are detected by file extension.
+       *
+       * This is intentional because photo_manager's
+       * AssetEntity thumbnail system is mainly for
+       * photos/videos and should not be relied upon
+       * for PDF, DOC, TXT, ZIP, etc.
+       */
+      documentFiles = files
+          .where(
+            (file) => _isDocument(file.fileName),
+          )
+          .toList();
+
+      images = imageFiles.length;
+
+      videos = videoFiles.length;
+
+      documents = documentFiles.length;
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        loading = false;
+
+        progress = 1;
+
+        folder = "Scan Completed";
+
+        hiddenFolders =
+            hiddenFolderPaths.length;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Hidden Scan Complete\n\n"
+            "Images: ${imageFiles.length}\n"
+            "Videos: ${videoFiles.length}\n"
+            "Documents: ${documentFiles.length}\n"
+            "Folders: $hiddenFolders\n"
+            "Total: ${files.length}",
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        loading = false;
+
+        progress = 0;
+
+        folder = "Scan failed";
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Scan failed: $e",
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> recoverSelected() async {
+    final selectedFiles = files
+        .where(
+          (file) => file.selected,
+        )
+        .toList();
+
+    if (selectedFiles.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Select files first",
+          ),
+        ),
+      );
+
+      return;
+    }
+
+    try {
+      final count =
+          await recoveryService.recoverFiles(
+        selectedFiles,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "$count files recovered successfully",
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Recovery failed: $e",
+          ),
+        ),
+      );
+    }
+  }
+bool _isDocument(String fileName) {
+    final String name =
+        fileName.toLowerCase();
+
+    const List<String> documentExtensions = [
+      '.pdf',
+      '.doc',
+      '.docx',
+      '.xls',
+      '.xlsx',
+      '.ppt',
+      '.pptx',
+      '.txt',
+      '.csv',
+      '.rtf',
+      '.odt',
+      '.ods',
+      '.odp',
+      '.epub',
+      '.html',
+      '.htm',
+      '.xml',
+      '.json',
+      '.log',
+      '.md',
+      '.zip',
+      '.rar',
+      '.7z',
+      '.tar',
+      '.gz',
+    ];
+
+    return documentExtensions.any(
+      (extension) => name.endsWith(extension),
+    );
+  }
+
+  IconData _documentIcon(String fileName) {
+    final String name =
+        fileName.toLowerCase();
+
+    if (name.endsWith('.pdf')) {
+      return Icons.picture_as_pdf;
+    }
+
+    if (name.endsWith('.doc') ||
+        name.endsWith('.docx')) {
+      return Icons.description;
+    }
+
+    if (name.endsWith('.xls') ||
+        name.endsWith('.xlsx') ||
+        name.endsWith('.csv')) {
+      return Icons.table_chart;
+    }
+
+    if (name.endsWith('.ppt') ||
+        name.endsWith('.pptx')) {
+      return Icons.slideshow;
+    }
+
+    if (name.endsWith('.zip') ||
+        name.endsWith('.rar') ||
+        name.endsWith('.7z') ||
+        name.endsWith('.tar') ||
+        name.endsWith('.gz')) {
+      return Icons.archive;
+    }
+
+    if (name.endsWith('.txt') ||
+        name.endsWith('.log') ||
+        name.endsWith('.md')) {
+      return Icons.article;
+    }
+
+    return Icons.insert_drive_file;
+  }
+
+  String _documentType(String fileName) {
+    final int dot =
+        fileName.lastIndexOf('.');
+
+    if (dot == -1) {
+      return 'DOCUMENT';
+    }
+
+    return fileName
+        .substring(dot + 1)
+        .toUpperCase();
+  }
+

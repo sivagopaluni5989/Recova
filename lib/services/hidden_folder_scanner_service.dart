@@ -244,11 +244,20 @@ class HiddenFolderScannerService {
 
 
 
+          bool isDocument =
+    [
+      "pdf",
+      "doc",
+      "docx",
+    ].contains(extension);
 
 
 
 
-          if (isImage || isVideo) {
+
+
+
+          if (isImage || isVideo || isDocument) {
 
 
 
@@ -260,9 +269,11 @@ class HiddenFolderScannerService {
       entity.uri.pathSegments.last,
 
   mediaType:
-      isVideo
-          ? MediaType.video
-          : MediaType.image,
+    isVideo
+        ? MediaType.video
+        : isDocument
+            ? MediaType.document
+            : MediaType.image,
 
   source:
       directory.path,

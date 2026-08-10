@@ -385,16 +385,12 @@ class MediaProvider extends ChangeNotifier {
 
 
 
-    final recovered =
+    final RecoveryResult result =
+    await _recoveryService.recoverFiles(
+  files,
+);
 
-        await _recoveryService
-
-            .recoverFiles(
-
-              files,
-
-            );
-
+final int recovered = result.recoveredFiles;
 
 
 

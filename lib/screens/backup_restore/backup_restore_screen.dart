@@ -225,11 +225,21 @@ message =
 
 
 
-    final count =
-        await _backupService.restoreBackup();
+    if (backupFiles.isEmpty) {
+  if (!mounted) return;
 
+  setState(() {
+    loading = false;
+    message = "No backup files available to restore";
+  });
 
+  return;
+}
 
+final BackupFile backupFile = backupFiles.first;
+
+final result =
+    await _backupService.restoreBackup(backupFile);   
 
 
     if(!mounted) return;
@@ -243,9 +253,17 @@ message =
 
 
 
-      message =
-          "Restore completed\nFiles restored: $count";
+      if (result is Map && result['success'] == true) {
+  final restoredCount = result['filesRestored'] ?? 0;
 
+  message =
+      "Restore completed\nFiles restored: $restoredCount";
+} else if (result is Map) {
+  message =
+      "Restore failed: ${result['error'] ?? 'Unknown error'}";
+} else {
+  message = "Restore completed";
+}
 
     });
 
