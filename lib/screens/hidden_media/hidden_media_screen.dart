@@ -1,6 +1,6 @@
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'dart:typed_data';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../../models/media_file.dart';
@@ -14,6 +14,7 @@ enum HiddenCategory {
   images,
   videos,
   documents,
+  recentlyDeleted,
 }
 
 class HiddenMediaScreen extends StatefulWidget {
@@ -26,7 +27,8 @@ class HiddenMediaScreen extends StatefulWidget {
       _HiddenMediaScreenState();
 }
 
-class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
+class _HiddenMediaScreenState
+    extends State<HiddenMediaScreen> {
   final MediaScannerService scanner =
       MediaScannerService();
 
@@ -47,6 +49,14 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
 
   List<MediaFile> documentFiles = [];
 
+  /*
+   * This remains separate from hidden media.
+   *
+   * It will be populated by the future Deep Media Scan
+   * recently-deleted scanner.
+   */
+  List<MediaFile> recentlyDeletedFiles = [];
+
   bool loading = false;
 
   double progress = 0;
@@ -59,7 +69,7 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
 
   int hiddenFolders = 0;
 
-  Set<String> hiddenFolderPaths = {};
+  final Set<String> hiddenFolderPaths = {};
 
   String folder = "Ready";
 
@@ -91,7 +101,8 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
     });
 
     try {
-      final scannedFiles = await scanner.scanMedia(
+      final scannedFiles =
+          await scanner.scanMedia(
         onProgress: (
           percent,
           currentFolder,
@@ -119,29 +130,37 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
         },
       );
 
-      files = List<MediaFile>.from(scannedFiles);
+      files =
+          List<MediaFile>.from(scannedFiles);
 
       final hiddenFiles =
           await hiddenScanner.scanHiddenFolders(
         onProgress: (
-          percent,
-          currentFolder,
-          current,
-          total,
-          imageCount,
-          videoCount,
+          double scanProgress,
+          String scanFolder,
+          int current,
+          int total,
+          int imageCount,
+          int videoCount,
+          int documentCount,
         ) {
           if (!mounted) {
             return;
           }
 
           setState(() {
-            progress = percent;
+            progress = scanProgress;
 
-            folder = "Hidden: $currentFolder";
+            folder = "Hidden: $scanFolder";
+
+            images = imageCount;
+
+            videos = videoCount;
+
+            documents = documentCount;
 
             hiddenFolderPaths.add(
-              currentFolder,
+              scanFolder,
             );
           });
         },
@@ -154,28 +173,23 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
       imageFiles = files
           .where(
             (file) =>
-                file.mediaType == MediaType.image,
+                file.mediaType ==
+                MediaType.image,
           )
           .toList();
 
       videoFiles = files
           .where(
             (file) =>
-                file.mediaType == MediaType.video,
+                file.mediaType ==
+                MediaType.video,
           )
           .toList();
 
-      /*
-       * Documents are detected by file extension.
-       *
-       * This is intentional because photo_manager's
-       * AssetEntity thumbnail system is mainly for
-       * photos/videos and should not be relied upon
-       * for PDF, DOC, TXT, ZIP, etc.
-       */
       documentFiles = files
           .where(
-            (file) => _isDocument(file.fileName),
+            (file) =>
+                _isDocument(file.fileName),
           )
           .toList();
 
@@ -200,7 +214,8 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
             hiddenFolderPaths.length;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
           content: Text(
             "Hidden Scan Complete\n\n"
@@ -210,7 +225,8 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
             "Folders: $hiddenFolders\n"
             "Total: ${files.length}",
           ),
-          behavior: SnackBarBehavior.floating,
+          behavior:
+              SnackBarBehavior.floating,
         ),
       );
     } catch (e) {
@@ -226,12 +242,14 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
         folder = "Scan failed";
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
           content: Text(
             "Scan failed: $e",
           ),
-          behavior: SnackBarBehavior.floating,
+          behavior:
+              SnackBarBehavior.floating,
         ),
       );
     }
@@ -245,7 +263,8 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
         .toList();
 
     if (selectedFiles.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             "Select files first",
@@ -266,7 +285,8 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
           content: Text(
             "$count files recovered successfully",
@@ -278,7 +298,8 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
           content: Text(
             "Recovery failed: $e",
@@ -292,7 +313,8 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
     final String name =
         fileName.toLowerCase();
 
-    const List<String> documentExtensions = [
+    const List<String>
+        documentExtensions = [
       '.pdf',
       '.doc',
       '.docx',
@@ -321,11 +343,14 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
     ];
 
     return documentExtensions.any(
-      (extension) => name.endsWith(extension),
+      (extension) =>
+          name.endsWith(extension),
     );
   }
 
-  IconData _documentIcon(String fileName) {
+  IconData _documentIcon(
+    String fileName,
+  ) {
     final String name =
         fileName.toLowerCase();
 
@@ -366,7 +391,9 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
     return Icons.insert_drive_file;
   }
 
-  String _documentType(String fileName) {
+  String _documentType(
+    String fileName,
+  ) {
     final int dot =
         fileName.lastIndexOf('.');
 
@@ -379,29 +406,181 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
         .toUpperCase();
   }
 
-
-  @override
-  Widget build(BuildContext context) {
-    List<MediaFile> visibleFiles;
-
+  List<MediaFile> _visibleFiles() {
     switch (selectedCategory) {
       case HiddenCategory.images:
-        visibleFiles = imageFiles;
-        break;
+        return imageFiles;
 
       case HiddenCategory.videos:
-        visibleFiles = videoFiles;
-        break;
+        return videoFiles;
 
       case HiddenCategory.documents:
-        visibleFiles = documentFiles;
-        break;
+        return documentFiles;
 
       case HiddenCategory.folders:
+        return files;
+
+      case HiddenCategory.recentlyDeleted:
+        return recentlyDeletedFiles;
+
       case HiddenCategory.all:
-        visibleFiles = files;
-        break;
+        return files;
     }
+  }
+
+  void _selectCategory(
+    HiddenCategory category,
+  ) {
+    setState(() {
+      selectedCategory = category;
+    });
+  }
+
+  Widget _buildCategoryChip({
+    required String label,
+    required IconData icon,
+    required HiddenCategory category,
+  }) {
+    final bool selected =
+        selectedCategory == category;
+
+    final bool recentlyDeleted =
+        category ==
+            HiddenCategory.recentlyDeleted;
+
+    return Padding(
+      padding:
+          const EdgeInsets.only(right: 7),
+      child: ChoiceChip(
+        selected: selected,
+        onSelected: (_) {
+          _selectCategory(category);
+        },
+        avatar: Icon(
+          icon,
+          size: 15,
+          color: selected
+              ? Colors.white
+              : recentlyDeleted
+                  ? Colors.red.shade700
+                  : Colors.grey.shade700,
+        ),
+        label: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight:
+                FontWeight.w600,
+            color: selected
+                ? Colors.white
+                : recentlyDeleted
+                    ? Colors.red.shade700
+                    : Colors.grey.shade800,
+          ),
+        ),
+        labelPadding:
+            const EdgeInsets.symmetric(
+          horizontal: 2,
+        ),
+        padding:
+            const EdgeInsets.symmetric(
+          horizontal: 7,
+          vertical: 2,
+        ),
+        materialTapTargetSize:
+            MaterialTapTargetSize
+                .shrinkWrap,
+        visualDensity:
+            const VisualDensity(
+          horizontal: -2,
+          vertical: -2,
+        ),
+        backgroundColor:
+            recentlyDeleted
+                ? Colors.red.shade50
+                : Colors.grey.shade100,
+        selectedColor:
+            recentlyDeleted
+                ? Colors.red.shade600
+                : const Color(0xff512DA8),
+        side: BorderSide(
+          color: selected
+              ? Colors.transparent
+              : recentlyDeleted
+                  ? Colors.red.shade200
+                  : Colors.grey.shade300,
+        ),
+        shape:
+            RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.circular(20),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterBar() {
+    return Padding(
+      padding:
+          const EdgeInsets.symmetric(
+        horizontal: 12,
+      ),
+      child: SingleChildScrollView(
+        scrollDirection:
+            Axis.horizontal,
+        physics:
+            const BouncingScrollPhysics(),
+        child: Row(
+          children: [
+            _buildCategoryChip(
+              label: 'All',
+              icon:
+                  Icons.grid_view_rounded,
+              category:
+                  HiddenCategory.all,
+            ),
+            _buildCategoryChip(
+              label: 'Photos',
+              icon:
+                  Icons.photo_rounded,
+              category:
+                  HiddenCategory.images,
+            ),
+            _buildCategoryChip(
+              label: 'Docs',
+              icon:
+                  Icons.description_rounded,
+              category:
+                  HiddenCategory.documents,
+            ),
+            _buildCategoryChip(
+              label: 'Videos',
+              icon:
+                  Icons.video_library_rounded,
+              category:
+                  HiddenCategory.videos,
+            ),
+            _buildCategoryChip(
+              label: 'Recently Deleted',
+              icon:
+                  Icons.delete_sweep_rounded,
+              category:
+                  HiddenCategory.recentlyDeleted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
+@override
+  Widget build(
+    BuildContext context,
+  ) {
+    final List<MediaFile> visibleFiles =
+        _visibleFiles();
 
     return Scaffold(
       appBar: AppBar(
@@ -410,17 +589,24 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
         ),
         centerTitle: true,
       ),
-
       body: Column(
         children: [
-          // ============================================================
-          // PURPLE DASHBOARD
-          // ============================================================
+          // ==========================================================
+          // DASHBOARD
+          // ==========================================================
 
           Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
+            margin:
+                const EdgeInsets.fromLTRB(
+              12,
+              12,
+              12,
+              10,
+            ),
+            padding:
+                const EdgeInsets.all(16),
+            decoration:
+                BoxDecoration(
               borderRadius:
                   BorderRadius.circular(22),
               gradient:
@@ -438,15 +624,16 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
                     const Icon(
                       Icons.folder_off,
                       color: Colors.white,
-                      size: 42,
+                      size: 38,
                     ),
-
-                    const SizedBox(width: 12),
-
+                    const SizedBox(
+                      width: 12,
+                    ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                            CrossAxisAlignment
+                                .start,
                         children: [
                           Text(
                             loading
@@ -454,21 +641,25 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
                                 : "Find Hidden Media",
                             style:
                                 const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
+                              color:
+                                  Colors.white,
+                              fontSize: 19,
                               fontWeight:
-                                  FontWeight.bold,
+                                  FontWeight
+                                      .bold,
                             ),
                           ),
-
-                          const SizedBox(height: 4),
-
+                          const SizedBox(
+                            height: 3,
+                          ),
                           const Text(
                             "Scan hidden folders and recover "
                             "media & documents",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
+                            style:
+                                TextStyle(
+                              color:
+                                  Colors.white70,
+                              fontSize: 11,
                             ),
                           ),
                         ],
@@ -476,368 +667,510 @@ class _HiddenMediaScreenState extends State<HiddenMediaScreen> {
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 18),
-
+                const SizedBox(
+                  height: 14,
+                ),
                 LinearProgressIndicator(
                   value: progress,
-                  minHeight: 8,
+                  minHeight: 7,
                   borderRadius:
-                      BorderRadius.circular(20),
+                      BorderRadius.circular(
+                    20,
+                  ),
                 ),
-
-                const SizedBox(height: 8),
-
+                const SizedBox(
+                  height: 7,
+                ),
                 Text(
                   folder,
                   maxLines: 1,
                   overflow:
                       TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style:
+                      const TextStyle(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: 11,
                   ),
                 ),
               ],
             ),
           ),
 
-          // ============================================================
-// CATEGORY CARDS - ALL FOUR IN ONE ROW
-// ============================================================
+          // ==========================================================
+          // COMPACT CATEGORY FILTERS
+          // ==========================================================
 
-Padding(
-  padding: const EdgeInsets.symmetric(
-    horizontal: 10,
-  ),
-  child: Row(
-    children: [
-      Expanded(
-        child: _categoryCardButton(
-          Icons.folder_off,
-          "Folders",
-          hiddenFolders,
-          Colors.deepPurple,
-          HiddenCategory.folders,
-        ),
-      ),
+          _buildFilterBar(),
 
-      const SizedBox(width: 6),
+          const SizedBox(
+            height: 10,
+          ),
 
-      Expanded(
-        child: _categoryCardButton(
-          Icons.photo_library,
-          "Images",
-          images,
-          Colors.blue,
-          HiddenCategory.images,
-        ),
-      ),
-
-      const SizedBox(width: 6),
-
-      Expanded(
-        child: _categoryCardButton(
-          Icons.video_collection,
-          "Videos",
-          videos,
-          Colors.orange,
-          HiddenCategory.videos,
-        ),
-      ),
-
-      const SizedBox(width: 6),
-
-      Expanded(
-        child: _categoryCardButton(
-          Icons.description,
-          "Docs",
-          documents,
-          Colors.teal,
-          HiddenCategory.documents,
-        ),
-      ),
-    ],
-  ),
-),
-
-const SizedBox(height: 14),
-
-           // ============================================================
-          // SCAN BUTTON
-          // ============================================================
+          // ==========================================================
+          // COMPACT STATISTICS
+          // ==========================================================
 
           Padding(
             padding:
                 const EdgeInsets.symmetric(
               horizontal: 12,
             ),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed:
-                    loading ? null : scan,
-                icon: const Icon(
-                  Icons.search,
+            child: Row(
+              children: [
+                Expanded(
+                  child:
+                      _miniStat(
+                    Icons.photo_library,
+                    "Photos",
+                    images,
+                    Colors.blue,
+                  ),
                 ),
-                label: Text(
-                  loading
-                      ? "Scanning..."
-                      : "Scan Hidden Media",
+                const SizedBox(
+                  width: 6,
                 ),
-              ),
+                Expanded(
+                  child:
+                      _miniStat(
+                    Icons.video_collection,
+                    "Videos",
+                    videos,
+                    Colors.orange,
+                  ),
+                ),
+                const SizedBox(
+                  width: 6,
+                ),
+                Expanded(
+                  child:
+                      _miniStat(
+                    Icons.description,
+                    "Docs",
+                    documents,
+                    Colors.teal,
+                  ),
+                ),
+                const SizedBox(
+                  width: 6,
+                ),
+                Expanded(
+                  child:
+                      _miniStat(
+                    Icons.folder_off,
+                    "Folders",
+                    hiddenFolders,
+                    Colors.deepPurple,
+                  ),
+                ),
+              ],
             ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(
+            height: 10,
+          ),
 
-          // ============================================================
-          // RECOVER BUTTON
-          // ============================================================
+          // ==========================================================
+          // ACTION BUTTONS
+          // ==========================================================
 
           Padding(
             padding:
                 const EdgeInsets.symmetric(
               horizontal: 12,
             ),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed:
-                    loading
-                        ? null
-                        : recoverSelected,
-                icon: const Icon(
-                  Icons.restore,
+            child: Row(
+              children: [
+                Expanded(
+                  child:
+                      ElevatedButton.icon(
+                    onPressed:
+                        loading
+                            ? null
+                            : scan,
+                    icon: const Icon(
+                      Icons.search,
+                      size: 18,
+                    ),
+                    label: Text(
+                      loading
+                          ? "Scanning..."
+                          : "Scan Hidden Media",
+                    ),
+                  ),
                 ),
-                label: const Text(
-                  "Recover Selected",
+                const SizedBox(
+                  width: 8,
                 ),
-              ),
+                Expanded(
+                  child:
+                      OutlinedButton.icon(
+                    onPressed:
+                        loading
+                            ? null
+                            : recoverSelected,
+                    icon: const Icon(
+                      Icons.restore,
+                      size: 18,
+                    ),
+                    label:
+                        const Text(
+                      "Recover Selected",
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(
+            height: 8,
+          ),
 
-          // ============================================================
+          // ==========================================================
+          // RECENTLY DELETED INFORMATION
+          // ==========================================================
+
+          if (selectedCategory ==
+              HiddenCategory.recentlyDeleted)
+            Container(
+              margin:
+                  const EdgeInsets.symmetric(
+                horizontal: 12,
+              ),
+              padding:
+                  const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 9,
+              ),
+              decoration:
+                  BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius:
+                    BorderRadius.circular(
+                  12,
+                ),
+                border: Border.all(
+                  color:
+                      Colors.red.shade100,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 18,
+                    color:
+                        Colors.red.shade700,
+                  ),
+                  const SizedBox(
+                    width: 8,
+                  ),
+                  Expanded(
+                    child: Text(
+                      "Recently Deleted will be "
+                      "populated by Deep Media Scan.",
+                      style: TextStyle(
+                        fontSize: 11,
+                        color:
+                            Colors.red.shade800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          const SizedBox(
+            height: 6,
+          ),
+          // ==========================================================
           // FILE GRID
-          // ============================================================
+          // ==========================================================
 
           Expanded(
-            child: visibleFiles.isEmpty &&
-                    !loading
-                ? _emptyState()
-                : GridView.builder(
-                    padding:
-                        const EdgeInsets.all(10),
-
-                    itemCount:
-                        visibleFiles.length,
-
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: 0.85,
-                    ),
-
-                    itemBuilder:
-                        (context, index) {
-                      final media =
-                          visibleFiles[index];
-
-
-   // ------------------------------------------------
-                      // DOCUMENT CARD
-                      // ------------------------------------------------
-
-                      if (_isDocument(
-                        media.fileName,
-                      )) {
-                        return _buildDocumentCard(
-                          media,
-                        );
-                      }
-
-                      // ------------------------------------------------
-                      // IMAGE / VIDEO CARD
-                      // ------------------------------------------------
-
-                      if (media.asset == null) {
-                        return _buildFallbackMediaCard(
-                          media,
-                        );
-                      }
-
-                      return FutureBuilder<
-                          Uint8List?>(
-                        future: media
-                            .asset!
-                            .thumbnailDataWithSize(
-                          const ThumbnailSize.square(
-                            400,
-                          ),
+            child:
+                visibleFiles.isEmpty &&
+                        !loading
+                    ? _emptyState()
+                    : GridView.builder(
+                        padding:
+                            const EdgeInsets
+                                .all(10),
+                        itemCount:
+                            visibleFiles.length,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                          childAspectRatio:
+                              0.85,
                         ),
+                        itemBuilder:
+                            (
+                          context,
+                          index,
+                        ) {
+                          final MediaFile
+                              media =
+                              visibleFiles[
+                                  index];
 
-                        builder:
-                            (context, snapshot) {
-                          if (!snapshot.hasData) {
-                            return Container(
-                              decoration:
-                                  BoxDecoration(
-                                color: Colors
-                                    .grey
-                                    .shade200,
-                                borderRadius:
-                                    BorderRadius
-                                        .circular(
-                                  16,
-                                ),
-                              ),
-                              child:
-                                  const Center(
-                                child:
-                                    CircularProgressIndicator(),
-                              ),
+                          if (_isDocument(
+                            media.fileName,
+                          )) {
+                            return _buildDocumentCard(
+                              media,
                             );
                           }
 
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                media.selected =
-                                    !media.selected;
-                              });
-                            },
+                          if (media.asset ==
+                              null) {
+                            return _buildFallbackMediaCard(
+                              media,
+                            );
+                          }
 
-                            child: Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius:
-                                      BorderRadius
-                                          .circular(
-                                    16,
+                          return FutureBuilder<
+                              Uint8List?>(
+                            future: media
+                                .asset!
+                                .thumbnailDataWithSize(
+                              const ThumbnailSize
+                                  .square(
+                                400,
+                              ),
+                            ),
+                            builder:
+                                (
+                              context,
+                              snapshot,
+                            ) {
+                              if (!snapshot
+                                  .hasData) {
+                                return Container(
+                                  decoration:
+                                      BoxDecoration(
+                                    color: Colors
+                                        .grey
+                                        .shade200,
+                                    borderRadius:
+                                        BorderRadius
+                                            .circular(
+                                      16,
+                                    ),
                                   ),
                                   child:
-                                      Image.memory(
-                                    snapshot.data!,
-                                    width:
-                                        double.infinity,
-                                    height:
-                                        double.infinity,
-                                    fit:
-                                        BoxFit.cover,
-                                  ),
-                                ),
-
-                                // VIDEO INDICATOR
-                                if (media.mediaType ==
-                                    MediaType.video)
-                                  Positioned(
-                                    top: 8,
-                                    left: 8,
+                                      const Center(
                                     child:
-                                        Container(
-                                      padding:
-                                          const EdgeInsets
-                                              .all(
-                                        6,
-                                      ),
-                                      decoration:
-                                          const BoxDecoration(
-                                        color:
-                                            Colors.black54,
-                                        shape:
-                                            BoxShape
-                                                .circle,
-                                      ),
-                                      child:
-                                          const Icon(
-                                        Icons
-                                            .play_arrow,
-                                        color:
-                                            Colors.white,
-                                        size: 20,
-                                      ),
-                                    ),
+                                        CircularProgressIndicator(),
                                   ),
+                                );
+                              }
 
-                                // SELECTED CHECK
-                                if (media.selected)
-                                  Positioned(
-                                    top: 8,
-                                    right: 8,
-                                    child:
-                                        Container(
-                                      padding:
-                                          const EdgeInsets
-                                              .all(
-                                        5,
-                                      ),
-                                      decoration:
-                                          const BoxDecoration(
-                                        color:
-                                            Colors.green,
-                                        shape:
-                                            BoxShape
-                                                .circle,
-                                      ),
-                                      child:
-                                          const Icon(
-                                        Icons.check,
-                                        color:
-                                            Colors.white,
-                                        size: 18,
-                                      ),
-                                    ),
-                                  ),
-
-                                // FILE NAME
-                                Positioned(
-                                  bottom: 6,
-                                  left: 6,
-                                  right: 6,
-                                  child:
-                                      Container(
-                                    padding:
-                                        const EdgeInsets
-                                            .symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration:
-                                        BoxDecoration(
-                                      color:
-                                          Colors.black54,
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    media.selected =
+                                        !media.selected;
+                                  });
+                                },
+                                child:
+                                    Stack(
+                                  children: [
+                                    ClipRRect(
                                       borderRadius:
                                           BorderRadius
                                               .circular(
-                                        8,
+                                        16,
+                                      ),
+                                      child:
+                                          Image.memory(
+                                        snapshot
+                                            .data!,
+                                        width:
+                                            double.infinity,
+                                        height:
+                                            double.infinity,
+                                        fit: BoxFit
+                                            .cover,
                                       ),
                                     ),
-                                    child: Text(
-                                      media.fileName,
-                                      maxLines: 1,
-                                      overflow:
-                                          TextOverflow
-                                              .ellipsis,
-                                      style:
-                                          const TextStyle(
-                                        color:
-                                            Colors.white,
-                                        fontSize: 11,
+
+                                    if (media
+                                            .mediaType ==
+                                        MediaType
+                                            .video)
+                                      Positioned(
+                                        top: 8,
+                                        left: 8,
+                                        child:
+                                            Container(
+                                          padding:
+                                              const EdgeInsets
+                                                  .all(
+                                            6,
+                                          ),
+                                          decoration:
+                                              const BoxDecoration(
+                                            color:
+                                                Colors.black54,
+                                            shape:
+                                                BoxShape.circle,
+                                          ),
+                                          child:
+                                              const Icon(
+                                            Icons
+                                                .play_arrow,
+                                            color:
+                                                Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+
+                                    if (media.selected)
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child:
+                                            Container(
+                                          padding:
+                                              const EdgeInsets
+                                                  .all(
+                                            5,
+                                          ),
+                                          decoration:
+                                              const BoxDecoration(
+                                            color:
+                                                Colors.green,
+                                            shape:
+                                                BoxShape.circle,
+                                          ),
+                                          child:
+                                              const Icon(
+                                            Icons
+                                                .check,
+                                            color:
+                                                Colors.white,
+                                            size: 18,
+                                          ),
+                                        ),
+                                      ),
+
+                                    Positioned(
+                                      bottom: 6,
+                                      left: 6,
+                                      right: 6,
+                                      child:
+                                          Container(
+                                        padding:
+                                            const EdgeInsets
+                                                .symmetric(
+                                          horizontal:
+                                              8,
+                                          vertical:
+                                              4,
+                                        ),
+                                        decoration:
+                                            BoxDecoration(
+                                          color:
+                                              Colors.black54,
+                                          borderRadius:
+                                              BorderRadius
+                                                  .circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child:
+                                            Text(
+                                          media
+                                              .fileName,
+                                          maxLines:
+                                              1,
+                                          overflow:
+                                              TextOverflow
+                                                  .ellipsis,
+                                          style:
+                                              const TextStyle(
+                                            color:
+                                                Colors.white,
+                                            fontSize:
+                                                11,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              );
+                            },
                           );
                         },
-                      );
-                    },
-                  ),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniStat(
+    IconData icon,
+    String title,
+    int count,
+    Color color,
+  ) {
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(
+        vertical: 7,
+        horizontal: 4,
+      ),
+      decoration:
+          BoxDecoration(
+        color: color.withValues(
+          alpha: 0.08,
+        ),
+        borderRadius:
+            BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(
+            alpha: 0.18,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment:
+            MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 17,
+          ),
+          const SizedBox(
+            width: 4,
+          ),
+          Column(
+            children: [
+              Text(
+                count.toString(),
+                style:
+                    const TextStyle(
+                  fontSize: 14,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+              ),
+              Text(
+                title,
+                style:
+                    const TextStyle(
+                  fontSize: 9,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -859,12 +1192,17 @@ const SizedBox(height: 14),
           Container(
             width: double.infinity,
             height: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+            decoration:
+                BoxDecoration(
+              color:
+                  Colors.grey.shade100,
               borderRadius:
-                  BorderRadius.circular(16),
+                  BorderRadius.circular(
+                16,
+              ),
               border: Border.all(
-                color: Colors.grey.shade300,
+                color:
+                    Colors.grey.shade300,
               ),
             ),
             child: Column(
@@ -878,12 +1216,13 @@ const SizedBox(height: 14),
                   size: 72,
                   color: Colors.teal,
                 ),
-
-                const SizedBox(height: 12),
-
+                const SizedBox(
+                  height: 12,
+                ),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(
+                      const EdgeInsets
+                          .symmetric(
                     horizontal: 10,
                     vertical: 5,
                   ),
@@ -904,19 +1243,21 @@ const SizedBox(height: 14),
                     ),
                     style:
                         const TextStyle(
-                      color: Colors.teal,
+                      color:
+                          Colors.teal,
                       fontSize: 12,
                       fontWeight:
                           FontWeight.bold,
                     ),
                   ),
                 ),
-
-                const SizedBox(height: 10),
-
+                const SizedBox(
+                  height: 10,
+                ),
                 Padding(
                   padding:
-                      const EdgeInsets.symmetric(
+                      const EdgeInsets
+                          .symmetric(
                     horizontal: 10,
                   ),
                   child: Text(
@@ -937,18 +1278,20 @@ const SizedBox(height: 14),
               ],
             ),
           ),
-
           if (media.selected)
             Positioned(
               top: 8,
               right: 8,
               child: Container(
                 padding:
-                    const EdgeInsets.all(5),
+                    const EdgeInsets.all(
+                  5,
+                ),
                 decoration:
                     const BoxDecoration(
                   color: Colors.green,
-                  shape: BoxShape.circle,
+                  shape:
+                      BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.check,
@@ -975,10 +1318,14 @@ const SizedBox(height: 14),
       child: Stack(
         children: [
           Container(
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
+            decoration:
+                BoxDecoration(
+              color:
+                  Colors.grey.shade200,
               borderRadius:
-                  BorderRadius.circular(16),
+                  BorderRadius.circular(
+                16,
+              ),
             ),
             child: Center(
               child: Icon(
@@ -987,22 +1334,25 @@ const SizedBox(height: 14),
                     ? Icons.video_file
                     : Icons.image,
                 size: 65,
-                color: Colors.grey.shade500,
+                color:
+                    Colors.grey.shade500,
               ),
             ),
           ),
-
           if (media.selected)
             Positioned(
               top: 8,
               right: 8,
               child: Container(
                 padding:
-                    const EdgeInsets.all(5),
+                    const EdgeInsets.all(
+                  5,
+                ),
                 decoration:
                     const BoxDecoration(
                   color: Colors.green,
-                  shape: BoxShape.circle,
+                  shape:
+                      BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.check,
@@ -1011,14 +1361,14 @@ const SizedBox(height: 14),
                 ),
               ),
             ),
-
           Positioned(
             bottom: 6,
             left: 6,
             right: 6,
             child: Container(
               padding:
-                  const EdgeInsets.symmetric(
+                  const EdgeInsets
+                      .symmetric(
                 horizontal: 8,
                 vertical: 4,
               ),
@@ -1026,7 +1376,9 @@ const SizedBox(height: 14),
                   BoxDecoration(
                 color: Colors.black54,
                 borderRadius:
-                    BorderRadius.circular(8),
+                    BorderRadius.circular(
+                  8,
+                ),
               ),
               child: Text(
                 media.fileName,
@@ -1046,102 +1398,14 @@ const SizedBox(height: 14),
     );
   }
 
-  Widget _categoryCardButton(
-    IconData icon,
-    String title,
-    int count,
-    Color color,
-    HiddenCategory category,
-  ) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedCategory = category;
-        });
-      },
-      child: _countCard(
-        icon,
-        title,
-        count,
-        color,
-        selectedCategory == category,
-      ),
-    );
-  }
-
-  Widget _countCard(
-    IconData icon,
-    String title,
-    int count,
-    Color color,
-    bool selected,
-  ) {
-    return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        vertical: 14,
-      ),
-      decoration: BoxDecoration(
-        color: selected
-            ? color.withValues(
-                alpha: 0.12,
-              )
-            : Colors.white,
-        borderRadius:
-            BorderRadius.circular(18),
-        border: Border.all(
-          color: selected
-              ? color
-              : Colors.grey.shade200,
-          width: selected ? 2 : 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            icon,
-            color: color,
-            size: 30,
-          ),
-
-          const SizedBox(height: 6),
-
-          Text(
-            count.toString(),
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight:
-                  FontWeight.bold,
-            ),
-          ),
-
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<MediaFile> removeDuplicates(
+ List<MediaFile> removeDuplicates(
     List<MediaFile> mediaList,
   ) {
-    final Map<String, MediaFile> unique =
-        {};
+    final Map<String, MediaFile>
+        unique = {};
 
-    for (final media in mediaList) {
-      /*
-       * Prefer the complete file path.
-       *
-       * Using:
-       *   fileName + filePath.length
-       *
-       * can accidentally treat two different files
-       * as the same file.
-       */
+    for (final MediaFile media
+        in mediaList) {
       final String key =
           media.filePath.isNotEmpty
               ? media.filePath
@@ -1164,35 +1428,52 @@ const SizedBox(height: 14),
 
     switch (selectedCategory) {
       case HiddenCategory.images:
-        title = "No hidden images found";
+        title =
+            "No hidden images found";
         subtitle =
             "Run scan to search hidden image files";
-        icon = Icons.photo_library_outlined;
+        icon =
+            Icons.photo_library_outlined;
         break;
 
       case HiddenCategory.videos:
-        title = "No hidden videos found";
+        title =
+            "No hidden videos found";
         subtitle =
             "Run scan to search hidden video files";
-        icon = Icons.video_library_outlined;
+        icon =
+            Icons.video_library_outlined;
         break;
 
       case HiddenCategory.documents:
-        title = "No hidden documents found";
+        title =
+            "No hidden documents found";
         subtitle =
             "Run scan to search PDF, DOC, TXT and other documents";
-        icon = Icons.description_outlined;
+        icon =
+            Icons.description_outlined;
         break;
 
       case HiddenCategory.folders:
-        title = "No hidden folders found";
+        title =
+            "No hidden folders found";
         subtitle =
             "Run scan to search hidden folders";
         icon = Icons.folder_off;
         break;
 
+      case HiddenCategory.recentlyDeleted:
+        title =
+            "No recently deleted media";
+        subtitle =
+            "Deep Media Scan will search accessible trash and recoverable locations.";
+        icon =
+            Icons.delete_sweep_outlined;
+        break;
+
       case HiddenCategory.all:
-        title = "No hidden files found";
+        title =
+            "No hidden files found";
         subtitle =
             "Run scan to search hidden media and documents";
         icon = Icons.folder_off;
@@ -1213,9 +1494,9 @@ const SizedBox(height: 14),
               color:
                   Colors.grey.shade400,
             ),
-
-            const SizedBox(height: 16),
-
+            const SizedBox(
+              height: 16,
+            ),
             Text(
               title,
               textAlign:
@@ -1227,9 +1508,9 @@ const SizedBox(height: 14),
                     FontWeight.bold,
               ),
             ),
-
-            const SizedBox(height: 6),
-
+            const SizedBox(
+              height: 6,
+            ),
             Text(
               subtitle,
               textAlign:

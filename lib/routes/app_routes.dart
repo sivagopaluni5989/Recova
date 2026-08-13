@@ -1,6 +1,6 @@
 
 import 'package:flutter/material.dart';
-
+import '../screens/info/info_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/scanner/scanner_screen.dart';
 import '../screens/backup_restore/backup_restore_screen.dart';
@@ -22,7 +22,7 @@ class AppRoutes {
 
   static const String history = '/history';
 
-
+  static const String info = '/info';
 
   static Map<String, WidgetBuilder> routes = {
 
@@ -44,6 +44,10 @@ class AppRoutes {
 
     history: (context) =>
         const HistoryScreen(),
+
+
+    info: (context) =>
+    const InfoScreen(),
 
 
 
